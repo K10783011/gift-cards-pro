@@ -64,8 +64,8 @@
       <button onclick="setFilter('Hi-Life')" id="tab-Hi-Life" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
         萊爾富 Hi-Life
       </button>
-      <button onclick="setFilter('OKMart')" id="tab-OKMart" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-        OK Mart
+      <button onclick="setFilter('宜睿')" id="tab-宜睿" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+        宜睿
       </button>
     </div>
 
@@ -151,7 +151,7 @@
             <option value="7-11">7-ELEVEN</option>
             <option value="FamilyMart">全家 FamilyMart</option>
             <option value="Hi-Life">萊爾富 Hi-Life</option>
-            <option value="OKMart">OK Mart</option>
+            <option value="宜睿">宜睿</option>
           </select>
         </div>
 
@@ -213,7 +213,7 @@
             <option value="7-11">7-ELEVEN</option>
             <option value="FamilyMart">全家 FamilyMart</option>
             <option value="Hi-Life">萊爾富 Hi-Life</option>
-            <option value="OKMart">OK Mart</option>
+            <option value="宜睿">宜睿</option>
           </select>
         </div>
 
@@ -289,7 +289,7 @@
     { id: '1', store: '7-11', code: '4710088432109', format: 'EAN13', balance: 350, date: '2026-03-10' },
     { id: '2', store: 'FamilyMart', code: '5900128473', format: 'CODE128', balance: 120, date: '2026-03-12' },
     { id: '3', store: 'Hi-Life', code: '4710382910', format: 'CODE128', balance: 0, date: '2026-02-28' },
-    { id: '4', store: 'OKMart', code: '4719001122', format: 'CODE128', balance: 200, date: '2026-03-15' }
+    { id: '4', store: '宜睿', code: '4719001122', format: 'CODE128', balance: 200, date: '2026-03-15' }
   ];
 
   let cards = [];
@@ -303,7 +303,7 @@
     '7-11': { name: '7-ELEVEN', badge: 'bg-emerald-600' },
     'FamilyMart': { name: '全家 FamilyMart', badge: 'bg-blue-600' },
     'Hi-Life': { name: '萊爾富 Hi-Life', badge: 'bg-red-600' },
-    'OKMart': { name: 'OK Mart', badge: 'bg-rose-700' }
+    '宜睿': { name: '宜睿', badge: 'bg-rose-700' }
   };
 
   function detectBarcodeFormat(code) {
@@ -1030,7 +1030,7 @@
     if (s.startsWith('711') || s.startsWith('471')) return '7-11';
     if (s.startsWith('590')) return 'FamilyMart';
     if (s.startsWith('4710')) return 'Hi-Life';
-    return 'OKMart';
+    return '宜睿';
   }
 </script>
 </body>
