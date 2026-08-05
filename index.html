@@ -896,7 +896,7 @@
           const code = String(d.rawValue || '');
           const format = d.format || detectBarcodeFormat(code);
           const cardStore = (selectedStore === 'auto') ? classifyStoreByBarcode(code) : selectedStore;
-          const cardBalance = (parsedBalance !== null && !isNaN(parsedBalance)) ? Math.max(0, parsedBalance) : (200 + (i * 100) + j);
+          const cardBalance = (parsedBalance !== null && !isNaN(parsedBalance))  ? Math.max(0, parsedBalance)  : getRandomIntInclusive(50, 100);
 
           cards.unshift({
             id: (Date.now() + i + j).toString(),
