@@ -154,7 +154,7 @@ function detectBarcodeFormat(code) {
   if (/^\d{13}$/.test(code.trim())) return 'EAN13';
   if (/^\d{8}$/.test(code.trim())) return 'EAN8';
   if (/^\d{12}$/.test(code.trim())) return 'UPC';
-  if (/^[A-Z0-9\-\.\ \$\/\+\%]+$/i.test(code.trim())) return 'CODE39';
+  if (/^[A-Z0-9\-\.\\\\ \$/\+\%]+$/i.test(code.trim())) return 'CODE39';
   return 'CODE128';
 }
 
@@ -213,7 +213,7 @@ async function acquireLock(ownerId, ttl=3000, retries=6, waitMs=200){
   }
   return false;
 }
-function releaseLock(ownerId){ try{ const raw=safeStorageGet(LOCK_KEY); if(!raw){ localStorage.removeItem(LOCK_KEY); return; } const lock=JSON.parse(raw); if(lock.owner===ownerId) localStorage.removeItem(LOCK_KEY); }catch(e){ try{ localStorage.removeItem(LOCK_KEY);}catch(e){} } }
+function releaseLock(ownerId){ try{ const raw=safeStorageGet(LOCK_KEY); if(!raw){ localStorage.removeItem(LOCK_KEY); return; } const lock=JSON.parse(raw); if(lock.owner===ownerId) localStorage.re[...]
 
 /* Atomic single-card update */
 async function updateCardBalanceAtomic(cardId, amount, idempotencyKey=null){
@@ -539,7 +539,7 @@ document.addEventListener('change', (e)=>{
 });
 
 /* Render redemptions list */
-function renderRedemptions(){ const el=document.getElementById('redemption-list'); if(!el) return; const items = loadRedemptions().slice(-20).reverse(); el.innerHTML = items.map(r=>`<li class="py-1 text-xs">${r.ts} - 卡:${r.cardId} - 扣款:NT$${r.amount} - tx:${r.transactionId||r.idempotencyKey}</li>`).join(''); }
+function renderRedemptions(){ const el=document.getElementById('redemption-list'); if(!el) return; const items = loadRedemptions().slice(-20).reverse(); el.innerHTML = items.map(r=>`<li class="py[...]
 
 /* classify helper */
 function classifyStoreByBarcode(code){
@@ -557,14 +557,74 @@ function handleFileSelect(e){
   // simplified: create random cards (or you can reuse your barcodeDetector code)
   Array.from(files).forEach((f,i)=>{
     const code = '471' + String(Math.floor(100000000 + Math.random()*900000000));
-    cards.unshift({ id: Date.now()+i, store: classifyStoreByBarcode(code), code, format: detectBarcodeFormat(code), balance: getRandomIntInclusive(50,100), date:new Date().toISOString().split('T')[0] });
+    cards.unshift({ id: Date.now()+i, store: classifyStoreByBarcode(code), code, format: detectBarcodeFormat(code), balance: getRandomIntInclusive(50,100), date:new Date().toISOString().split('T')[...]
   });
   saveCardsToStorage(); renderCards();
   closeModal('batch-modal');
 }
 
-/* Edit modal placeholder (use your existing implementation) */
-function openEditModal(id){ selectedCardId = id; /* open and populate your edit modal as before */ alert('請使用原有編輯視窗 (此示範版本未包含完整 edit modal handler)'); }
+/* Edit modal implementation ported from gift.cards */
+function openEditModal(id) {
+  selectedCardId = id;
+  const card = cards.find(c => String(c.id) === String(id));
+  if (!card) return;
+
+  // store select: if store isn't in known list, select "other" and fill input
+  const storeSelect = document.getElementById('edit-store');
+  const storeOther = document.getElementById('edit-store-other');
+  if (Object.keys(storeConfigs).includes(card.store)) {
+    storeSelect.value = card.store;
+    storeOther.value = '';
+    storeOther.classList.add('hidden');
+  } else if (card.store && card.store !== null) {
+    storeSelect.value = 'other';
+    storeOther.value = card.store;
+    storeOther.classList.remove('hidden');
+  } else {
+    storeSelect.value = '7-11';
+    storeOther.value = '';
+    storeOther.classList.add('hidden');
+  }
+
+  document.getElementById('edit-code').value = String(card.code);
+  document.getElementById('edit-format').value = card.originalFormat || detectBarcodeFormat(card.code);
+  document.getElementById('edit-balance').value = card.balance === null || card.balance === undefined ? '' : Number(card.balance);
+
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function handleSaveEdit(e) {
+  e.preventDefault();
+  const card = cards.find(c => String(c.id) === String(selectedCardId));
+  if (card) {
+    // handle store possibly "other"
+    const storeSel = document.getElementById('edit-store').value;
+    if (storeSel === 'other') {
+      const other = document.getElementById('edit-store-other').value.trim();
+      card.store = other || 'other';
+    } else {
+      card.store = storeSel;
+    }
+
+    card.code = String(document.getElementById('edit-code').value.trim());
+    card.originalFormat = document.getElementById('edit-format').value;
+    const balVal = document.getElementById('edit-balance').value;
+    card.balance = balVal === '' ? null : Math.max(0, parseInt(balVal, 10) || 0);
+
+    saveCardsToStorage();
+    renderCards();
+    closeModal('edit-modal');
+  }
+}
+
+function handleDeleteCard() {
+  if (confirm('確定要刪除這張商品卡嗎？此動作無法復原。')) {
+    cards = cards.filter(c => String(c.id) !== String(selectedCardId));
+    saveCardsToStorage();
+    renderCards();
+    closeModal('edit-modal');
+  }
+}
 
 /* Boot */
 document.addEventListener('DOMContentLoaded', ()=>{
