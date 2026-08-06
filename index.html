@@ -157,7 +157,7 @@
             padding: 24px;
             border-radius: 12px;
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
 
@@ -188,12 +188,33 @@
             font-family: monospace;
             background: #000;
             color: #fff;
-            padding: 6px;
+            padding: 10px;
             text-align: center;
             letter-spacing: 2px;
-            margin-top: 4px;
+            margin-top: 8px;
             border-radius: 4px;
+            font-size: 1rem;
         }
+
+        .controls {
+            display:flex;
+            gap:8px;
+            margin-top:8px;
+        }
+
+        .small-btn {
+            padding:8px 10px;
+            border-radius:6px;
+            border:none;
+            cursor:pointer;
+            font-weight:600;
+        }
+
+        .small-btn-primary { background: var(--primary-color); color:#fff; }
+        .small-btn-muted { background:#e5e7eb; color:#374151; }
+
+        .allocation-list { max-height: 220px; overflow:auto; margin-top:10px; }
+        .alloc-used { text-decoration: line-through; opacity:0.6; }
     </style>
 </head>
 <body>
@@ -217,11 +238,18 @@
         <h3 id="modal-store-title">快速結帳</h3>
         <p style="font-size: 0.9rem; color: var(--text-sub);">請輸入本次消費總金額，系統將自動套用最小餘額優先扣款：</p>
         <input type="number" id="checkout-amount" class="modal-input" placeholder="例如: 350">
+
+        <!-- 自動輪播切換（預設開） -->
+        <label style="display:block; margin-bottom:8px;">
+            <input type="checkbox" id="auto-advance-toggle" checked> 自動輪播（掃描或按已使用後自動顯示下一張）
+        </label>
+
         <div id="modal-actions">
-            <button class="btn" onclick="confirmCheckout()">確認結帳並顯示條碼</button>
+            <button class="btn" onclick="confirmCheckout()">確認結帳並準備條碼（不會立即扣款，須逐張標示已使用）</button>
             <button class="btn btn-secondary" onclick="closeModal()">取消</button>
         </div>
-        <div id="checkout-result" style="margin-top: 15px; max-height: 250px; overflow-y: auto;"></div>
+
+        <div id="checkout-result" style="margin-top: 15px; max-height: 360px; overflow-y: auto;"></div>
     </div>
 </div>
 
@@ -238,6 +266,11 @@
 
     let giftCards = [];
     let activeStoreForCheckout = null;
+
+    // 當前 checkout 的 allocations（未必已扣款）
+    // 每個 allocation: { cardId, barcode, allocated, used=false, cardRef }
+    let currentAllocations = [];
+    let currentStepIndex = 0;
 
     // 初始化載入
     function initApp() {
@@ -299,7 +332,9 @@
                         <span class="sub-card-id">${c.id}</span>
                         <span class="sub-card-barcode">條碼: ${c.barcode}</span>
                     </div>
-                    <div class="sub-card-bal">$${c.balance}</div>
+                    <div style="text-align:right;">
+                        <div class="sub-card-bal">$${c.balance}</div>
+                    </div>
                 </div>
             `).join('');
 
@@ -320,19 +355,46 @@
     // 彈跳視窗控制
     function openCheckoutModal(storeName) {
         activeStoreForCheckout = storeName;
-        document.getElementById('modal-store-titleinnerText').innerText = `${storeName} 快速結帳`;
+        document.getElementById('modal-store-title').innerText = `${storeName} 快速結帳`;
         document.getElementById('checkout-amount').value = '';
         document.getElementById('checkout-result').innerHTML = '';
+        document.getElementById('auto-advance-toggle').checked = true; // 預設開啟
+        currentAllocations = [];
+        currentStepIndex = 0;
         document.getElementById('checkout-modal').style.display = 'flex';
     }
 
     function closeModal() {
         document.getElementById('checkout-modal').style.display = 'none';
         activeStoreForCheckout = null;
+        currentAllocations = [];
+        currentStepIndex = 0;
         renderUI(); // 關閉時重新整理主畫面以更新餘額
     }
 
-    // 核心扣款邏輯：最小餘額優先
+    // 分配演算法（最小餘額優先）
+    function allocateBySmallest(storeCards, amount) {
+        // storeCards 已包含對應 store 的卡片物件
+        const sorted = storeCards.slice().sort((a,b) => a.balance - b.balance);
+        let remaining = amount;
+        const allocations = [];
+        for (const c of sorted) {
+            if (remaining <= 0) break;
+            const use = Math.min(c.balance, remaining);
+            allocations.push({
+                cardId: c.id,
+                barcode: c.barcode,
+                allocated: use,
+                used: false,
+                // cardRef 用於之後扣款時找到原始物件
+                cardRef: c
+            });
+            remaining -= use;
+        }
+        return { allocations, remaining }; // remaining >0 表示餘額不足
+    }
+
+    // 核心：準備 allocation 並顯示條碼序列（但不馬上扣款）
     function confirmCheckout() {
         let amountInput = document.getElementById('checkout-amount').value;
         let amount = parseFloat(amountInput);
@@ -342,12 +404,11 @@
             return;
         }
 
-        // 1. 抓出該超商卡片並強制「最小餘額優先」排序
-        let storeCards = giftCards.filter(c => c.store === activeStoreForCheckout);
+        // 取得該超商卡片
+        let storeCards = giftCards.filter(c => c.store === activeStoreForCheckout && c.balance > 0);
         storeCards.sort((a, b) => a.balance - b.balance);
 
         let totalAvailable = storeCards.reduce((sum, c) => sum + c.balance, 0);
-
         let resultContainer = document.getElementById('checkout-result');
 
         if (totalAvailable < amount) {
@@ -355,41 +416,188 @@
             return;
         }
 
-        let remainingAmount = amount;
-        let logs = [];
-
-        // 2. 迴圈依序扣款
-        for (let card of storeCards) {
-            if (remainingAmount <= 0) break;
-
-            let deduct = Math.min(card.balance, remainingAmount);
-            card.balance -= deduct;
-            remainingAmount -= deduct;
-
-            logs.push({
-                cardId: card.id,
-                barcode: card.barcode,
-                deducted: deduct,
-                newBalance: card.balance
-            });
+        const { allocations, remaining } = allocateBySmallest(storeCards, amount);
+        if (remaining > 0) {
+            resultContainer.innerHTML = `<p style="color: red; font-weight: bold;">扣款失敗：分配錯誤（請稍後重試）</p>`;
+            return;
         }
 
-        // 3. 儲存最新狀態
+        // 設定全域 allocation state
+        currentAllocations = allocations;
+        currentStepIndex = 0;
+
+        // 顯示 allocation 列表與條碼操作 UI
+        renderAllocationsUI();
+    }
+
+    // 重新繪製 modal 的 allocation UI 區域
+    function renderAllocationsUI() {
+        const rc = document.getElementById('checkout-result');
+        if (!currentAllocations || currentAllocations.length === 0) {
+            rc.innerHTML = `<p>尚無待刷卡的分配。</p>`;
+            return;
+        }
+
+        let html = `<p style="color: green; font-weight: bold; margin-bottom: 10px;">✅ 已計算分配，請依序出示以下條碼並標示「已使用」：</p>`;
+        html += `<div class="allocation-list">`;
+        currentAllocations.forEach((a, idx) => {
+            html += `<div class="result-step ${a.used ? 'alloc-used' : ''}" id="alloc-${idx}">
+                        <strong>步驟 ${idx+1}：${a.cardId}</strong>
+                        <div>將扣抵：<span style="color:#d97706; font-weight:bold;">$${a.allocated}</span> / 卡片剩餘 (預覽)：$${a.cardRef.balance}${a.used ? '（已標記為已使用）' : ''}</div>
+                        <div style="margin-top:6px; font-size:0.95rem; color:var(--text-sub)">條碼：<span style="font-family:monospace;">${a.barcode}</span></div>
+                     </div>`;
+        });
+        html += `</div>`;
+
+        // 顯示當前條碼大圖，操作按鈕 & 掃描貼上欄位
+        const cur = currentAllocations[currentStepIndex];
+        html += `<div style="margin-top:12px;">
+                    <div style="font-size:0.9rem; color:var(--text-sub);">當前條碼（步驟 ${currentStepIndex+1}/${currentAllocations.length}）：</div>
+                    <div class="barcode-box" id="current-barcode-display">║█║▌║█║${cur.barcode}</div>
+
+                    <div class="controls">
+                        <button class="small-btn small-btn-primary" onclick="markCurrentAsUsed()">已使用</button>
+                        <button class="small-btn small-btn-muted" onclick="advanceStep()">下一張</button>
+                        <button class="small-btn small-btn-muted" onclick="markAllAsUsed()">全部標為已使用</button>
+                    </div>
+
+                    <div style="margin-top:10px;">
+                        <label style="font-size:0.9rem; color:var(--text-sub); display:block; margin-bottom:6px;">貼上/輸入掃描到的條碼（可貼相機/批次輸入內容）：</label>
+                        <input id="scan-input" class="modal-input" placeholder="例: 711-BARCODE-9981 或 多個條碼以逗號分隔">
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn" onclick="applyScanInput()">比對並套用掃描</button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('scan-input').value=''">清除</button>
+                        </div>
+                    </div>
+                 </div>`;
+
+        rc.innerHTML = html;
+        // 滾動到當前步驟
+        const curEl = document.getElementById(`alloc-${currentStepIndex}`);
+        if (curEl) curEl.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+
+    // 將當前 allocation 標示為已使用並真正從卡片扣款（此處會更新 localStorage）
+    function markCurrentAsUsed() {
+        if (!currentAllocations || currentAllocations.length === 0) return;
+        const cur = currentAllocations[currentStepIndex];
+        if (cur.used) {
+            // 已標示，直接 advance
+            advanceStep();
+            return;
+        }
+
+        // 從真正的 giftCards 中找到該卡並扣款
+        const card = giftCards.find(c => c.id === cur.cardId && c.barcode === cur.barcode);
+        if (!card) {
+            alert('找不到對應卡片（可能已被移除）。');
+            return;
+        }
+
+        // 最終扣款：已經在 allocation 中算好 allocated，直接扣（注意：若同一張卡同時被多次 allocation，分配階段即為分割）
+        card.balance = Math.max(0, card.balance - cur.allocated);
+        cur.used = true;
+
+        // 儲存變更
         saveCards();
 
-        // 4. 顯示連續刷卡與條碼指引
-        let htmlResult = `<p style="color: green; font-weight: bold; margin-bottom: 10px;">✅ 扣款成功！請依序出示以下條碼：</p>`;
-        logs.forEach((log, index) => {
-            htmlResult += `
-                <div class="result-step">
-                    <strong>步驟 ${index + 1}：請刷 ${log.cardId}</strong><br>
-                    扣抵金額：<span style="color: #d97706; font-weight: bold;">$${log.deducted}</span> (卡片剩餘: $${log.newBalance})
-                    <div class="barcode-box">║█║▌║█║${log.barcode}</div>
-                </div>
-            `;
-        });
+        // 更新 UI 樣式與顯示
+        renderAllocationsUI();
 
-        resultContainer.innerHTML = htmlResult;
+        // 若 auto advance 啟用，則自動下一張
+        const auto = document.getElementById('auto-advance-toggle').checked;
+        if (auto) {
+            // 小延遲以便使用者看到「已使用」狀態
+            setTimeout(advanceStep, 600);
+        }
+    }
+
+    // 手動前往下一張（或完成）
+    function advanceStep() {
+        if (!currentAllocations || currentAllocations.length === 0) return;
+        if (currentStepIndex < currentAllocations.length - 1) {
+            currentStepIndex++;
+            renderAllocationsUI();
+        } else {
+            // 已到最後一張，檢查是否所有 allocation 都被標為 used
+            const allUsed = currentAllocations.every(a => a.used);
+            if (!allUsed) {
+                if (confirm('尚有未標示為已使用的卡，確定要結束並保留未標示的分配？')) {
+                    finalizeIfDone();
+                    closeModal();
+                }
+                return;
+            }
+            // 全部使用完畢
+            finalizeIfDone();
+            // 顯示完成訊息
+            const rc = document.getElementById('checkout-result');
+            rc.innerHTML = `<p style="color:green; font-weight:bold;">所有卡片已完整使用並更新餘額。交易完成 ✅</p>`;
+            // 小延遲後關閉 modal
+            setTimeout(closeModal, 900);
+        }
+    }
+
+    // 標示全部為已使用（危險操作，會直接扣款）
+    function markAllAsUsed() {
+        if (!currentAllocations || currentAllocations.length === 0) return;
+        if (!confirm('將會把所有分配標記為已使用並從卡片扣款，確定？')) return;
+        currentAllocations.forEach((a) => {
+            if (!a.used) {
+                const card = giftCards.find(c => c.id === a.cardId && c.barcode === a.barcode);
+                if (card) {
+                    card.balance = Math.max(0, card.balance - a.allocated);
+                }
+                a.used = true;
+            }
+        });
+        saveCards();
+        renderAllocationsUI();
+        // 若 auto advance，跳到最後步驟並觸發完成
+        currentStepIndex = currentAllocations.length - 1;
+        setTimeout(advanceStep, 600);
+    }
+
+    // 當 scanner input 被貼上/輸入時，比對條碼並標為已使用（支援逗號分隔多條）
+    function applyScanInput() {
+        const raw = document.getElementById('scan-input').value.trim();
+        if (!raw) {
+            alert('請貼上或輸入掃描到的條碼內容！');
+            return;
+        }
+        // 允許逗號或換行分割多個條碼
+        const parts = raw.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
+        let matchedAny = false;
+        for (const p of parts) {
+            // 在尚未 used 的 allocations 中尋找匹配條碼（優先當前 step）
+            let idx = currentAllocations.findIndex((a, i) => !a.used && a.barcode === p);
+            if (idx === -1) {
+                // 可能輸入包含飾符（前綴/後綴），嘗試模糊比對
+                idx = currentAllocations.findIndex((a) => !a.used && a.barcode.includes(p));
+            }
+            if (idx !== -1) {
+                matchedAny = true;
+                // 若找到且不是當前 step，先跳到那一步
+                currentStepIndex = idx;
+                // 標示已使用（這會扣款）
+                markCurrentAsUsed();
+            }
+        }
+        if (!matchedAny) {
+            alert('無匹配的條碼，請確認內容或改為手動按「已使用」。');
+        } else {
+            // 清除輸入
+            document.getElementById('scan-input').value = '';
+        }
+    }
+
+    // 檢查是否全部 done，若 done 就寫入變更（已在 markCurrentAsUsed 中寫入）
+    function finalizeIfDone() {
+        const allUsed = currentAllocations.every(a => a.used);
+        if (allUsed) {
+            // 保險起見再次儲存
+            saveCards();
+        }
     }
 
     // 頁面載入初始化
