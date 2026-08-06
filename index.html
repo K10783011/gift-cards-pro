@@ -1,1037 +1,400 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>超商商品卡便捷管理系統</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- JsBarcode library for rendering 1D barcodes -->
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    svg { image-rendering: pixelated; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品卡錢包</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--text-main);
+        }
+
+        header p {
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        /* 儲值卡/超商群組卡片 */
+        .store-group {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .store-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+
+        .store-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .store-total-balance {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #059669;
+        }
+
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .sub-card {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .sub-card-info span {
+            display: block;
+        }
+
+        .sub-card-id {
+            font-weight: 600;
+        }
+
+        .sub-card-barcode {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            font-family: monospace;
+        }
+
+        .sub-card-bal {
+            font-weight: bold;
+            color: #374151;
+        }
+
+        /* 按鈕風格 */
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+            margin-top: 8px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+
+        /* 互動面板 (Modal 簡易版) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: var(--text-main);
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 1.1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+        }
+
+        .result-step {
+            background-color: #f3f4f6;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .barcode-box {
+            font-family: monospace;
+            background: #000;
+            color: #fff;
+            padding: 6px;
+            text-align: center;
+            letter-spacing: 2px;
+            margin-top: 4px;
+            border-radius: 4px;
+        }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans">
+<body>
 
-  <!-- Header & Total Summary Bar -->
-  <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
-    <div class="max-w-4xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-      <div class="flex items-center space-x-3">
-        <i class="fa-solid fa-wallet text-2xl text-indigo-200"></i>
-        <div>
-          <h1 class="text-xl font-bold tracking-wide">商品卡數位管家</h1>
-          <p class="text-xs text-indigo-200">即時掃描 · 原格式還原 · 本地自動儲存</p>
+<div class="container">
+    <header>
+        <h1>智慧商品卡錢包</h1>
+        <p>同超商自動串接、最小餘額優先折抵</p>
+    </header>
+
+    <!-- 動態產生超商群組清單 -->
+    <div id="stores-container"></div>
+
+    <!-- 重置預設資料按鈕 -->
+    <button class="btn btn-secondary" onclick="resetToDefaultData()">重置/初始化預設卡片資料</button>
+</div>
+
+<!-- 結帳互動視窗 -->
+<div id="checkout-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="modal-store-title">快速結帳</h3>
+        <p style="font-size: 0.9rem; color: var(--text-sub);">請輸入本次消費總金額，系統將自動套用最小餘額優先扣款：</p>
+        <input type="number" id="checkout-amount" class="modal-input" placeholder="例如: 350">
+        <div id="modal-actions">
+            <button class="btn" onclick="confirmCheckout()">確認結帳並顯示條碼</button>
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
         </div>
-      </div>
-      <!-- Total Balance Display -->
-      <div class="bg-indigo-800/80 border border-indigo-500/30 rounded-xl px-5 py-2 text-right w-full sm:w-auto flex justify-between sm:block">
-        <span class="text-xs text-indigo-200 block sm:inline">目前有效卡總額</span>
-        <span id="total-balance" class="text-2xl font-extrabold text-amber-300 ml-2">NT$ 0</span>
-      </div>
+        <div id="checkout-result" style="margin-top: 15px; max-height: 250px; overflow-y: auto;"></div>
     </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
-
-    <!-- Action Toolbar: Scan & Import -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-      <button onclick="openScanModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 px-4 rounded-xl shadow-sm flex items-center justify-center space-x-2 font-medium transition active:scale-95">
-        <i class="fa-solid fa-camera text-lg"></i>
-        <span>開啟相機掃描條碼</span>
-      </button>
-      <button onclick="triggerFileInput()" class="bg-slate-800 hover:bg-slate-900 text-white py-3.5 px-4 rounded-xl shadow-sm flex items-center justify-center space-x-2 font-medium transition active:scale-95">
-        <i class="fa-solid fa-file-image text-lg"></i>
-        <span>照片批次匯入商品卡</span>
-      </button>
-      <input type="file" id="batch-file-input" accept="image/*" multiple class="hidden" onchange="handleFileSelect(event)">
-    </div>
-
-    <!-- Category Filter Tabs -->
-    <div class="flex items-center space-x-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
-      <button onclick="setFilter('all')" id="tab-all" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-indigo-600 text-white shadow-sm">
-        全部類別
-      </button>
-      <button onclick="setFilter('7-11')" id="tab-7-11" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-        7-ELEVEN
-      </button>
-      <button onclick="setFilter('FamilyMart')" id="tab-FamilyMart" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-        全家 FamilyMart
-      </button>
-      <button onclick="setFilter('Hi-Life')" id="tab-Hi-Life" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-        萊爾富 Hi-Life
-      </button>
-      <button onclick="setFilter('宜睿')" id="tab-宜睿" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-        宜睿
-      </button>
-    </div>
-
-    <!-- Card Grid Container -->
-    <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-
-    <!-- Empty State -->
-    <div id="empty-state" class="hidden flex-col items-center justify-center py-16 text-slate-400">
-      <i class="fa-solid fa-credit-card text-5xl mb-3"></i>
-      <p class="text-base font-medium">尚無相關商品卡記錄</p>
-    </div>
-
-    <!-- Redemption debug list (可移除) -->
-    <div class="max-w-4xl mx-auto px-4 py-2">
-      <details class="text-sm text-slate-500">
-        <summary class="cursor-pointer">最近扣款記錄（debug）</summary>
-        <ul id="redemption-list" class="mt-2"></ul>
-      </details>
-    </div>
-  </main>
-
-  <!-- Checkout / Pay Modal -->
-  <div id="pay-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <button onclick="closeModal('pay-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
-        <i class="fa-solid fa-xmark text-xl"></i>
-      </button>
-      <div class="text-center">
-        <span id="modal-store-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white inline-block mb-1">7-ELEVEN</span>
-        <h3 class="text-lg font-bold text-slate-800">出示條碼結帳</h3>
-        <p class="text-xs text-slate-500 mt-0.5">請將條碼對準超商刷卡機</p>
-      </div>
-
-      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 my-4 flex flex-col items-center justify-center">
-        <svg id="pay-barcode" class="w-full h-24 max-w-xs"></svg>
-        <div class="flex items-center space-x-2 mt-2">
-          <span id="pay-card-num" class="text-sm font-mono tracking-widest text-slate-700 font-bold"></span>
-          <span id="pay-barcode-format" class="text-[10px] bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full uppercase">CODE128</span>
-        </div>
-      </div>
-
-      <div class="space-y-4">
-        <div class="flex justify-between items-center text-sm font-medium bg-indigo-50/60 p-3 rounded-lg border border-indigo-100">
-          <span class="text-slate-600">卡片目前餘額</span>
-          <span id="pay-modal-balance" class="text-lg font-bold text-indigo-700">NT$ 0</span>
-        </div>
-
-        <form onsubmit="handleCheckout(event)" class="space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">輸入本次消費扣款金額 (NT$)</label>
-            <div class="relative">
-              <input type="number" id="deduct-amount" min="1" required placeholder="例如：45" class="w-full pl-8 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-semibold">
-              <span class="absolute left-3 top-2.5 text-slate-400">$</span>
-            </div>
-          </div>
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-md transition active:scale-95 flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-check"></i>
-            <span>完成扣款並更新餘額</span>
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Card Modal -->
-  <div id="edit-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <button onclick="closeModal('edit-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
-        <i class="fa-solid fa-xmark text-xl"></i>
-      </button>
-
-      <div class="flex items-center space-x-2 mb-4">
-        <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-          <i class="fa-solid fa-pen-to-square"></i>
-        </div>
-        <h3 class="text-lg font-bold text-slate-800">編輯商品卡資料</h3>
-      </div>
-
-      <form onsubmit="handleSaveEdit(event)" class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">發行超商</label>
-          <select id="edit-store" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
-            <option value="7-11">7-ELEVEN</option>
-            <option value="FamilyMart">全家 FamilyMart</option>
-            <option value="Hi-Life">萊爾富 Hi-Life</option>
-            <option value="宜睿">宜睿</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">一維條碼 / 卡號</label>
-          <input type="text" id="edit-code" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono tracking-wide">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">原始條碼格式</label>
-          <select id="edit-format" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm">
-            <option value="EAN13">EAN-13 (13位數字)</option>
-            <option value="EAN8">EAN-8 (8位數字)</option>
-            <option value="CODE128">CODE128 (萬用數位與英文)</option>
-            <option value="CODE39">CODE39 (傳統數字字母)</option>
-            <option value="UPC">UPC (美規條碼)</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">卡片餘額 (NT$)</label>
-          <input type="number" id="edit-balance" min="0" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800">
-        </div>
-
-        <div class="pt-2 flex space-x-3">
-          <button type="button" onclick="handleDeleteCard()" class="px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 rounded-lg font-semibold text-sm transition">
-            <i class="fa-solid fa-trash-can mr-1"></i> 刪除卡片
-          </button>
-          <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-bold text-sm shadow-sm transition">
-            儲存變更
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 批次匯入設定彈窗 -->
-  <div id="batch-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <button onclick="closeModal('batch-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
-        <i class="fa-solid fa-xmark text-xl"></i>
-      </button>
-
-      <div class="flex items-center space-x-2 mb-2">
-        <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-          <i class="fa-solid fa-file-import"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-slate-800">批次匯入設定</h3>
-          <p class="text-xs text-slate-500" id="batch-file-count-text">已選取 0 張照片</p>
-        </div>
-      </div>
-
-      <form onsubmit="executeBatchImport(event)" class="space-y-4 mt-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">指定超商類別</label>
-          <select id="batch-store" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
-            <option value="auto">⚡ 依條碼前綴自動判斷</option>
-            <option value="7-11">7-ELEVEN</option>
-            <option value="FamilyMart">全家 FamilyMart</option>
-            <option value="Hi-Life">萊爾富 Hi-Life</option>
-            <option value="宜睿">宜睿</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">設定每張商品卡金額 (NT$)</label>
-          <div class="relative">
-            <input type="number" id="batch-balance" min="0" placeholder="留空則自動隨機設定 ($50~$100)" class="w-full pl-8 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-semibold">
-<span class="absolute left-3 top-2 text-slate-400">$</span>
-          </div>
-          <p class="text-[11px] text-slate-400 mt-1">若這批卡片金額皆相同（例如：都是 $100），請直接在此輸入。</p>
-        </div>
-
-        <div class="pt-2 flex space-x-3">
-          <button type="button" onclick="closeModal('batch-modal')" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-semibold text-sm transition">
-            取消
-          </button>
-          <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-bold text-sm shadow-sm transition flex items-center justify-center space-x-1">
-            <i class="fa-solid fa-plus"></i>
-            <span>確認匯入</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Scan Modal -->
-  <div id="scan-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-center">
-      <button onclick="closeModal('scan-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
-        <i class="fa-solid fa-xmark text-xl"></i>
-      </button>
-      <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="fa-solid fa-barcode"></i>
-      </div>
-      <h3 class="text-lg font-bold text-slate-800 mb-1">相機條碼掃描</h3>
-      <p class="text-xs text-slate-500 mb-4">將超商商品卡一維條碼置於框內即可自動識別原格式</p>
-      
-      <!-- 動態鏡頭容器 -->
-      <div class="relative bg-slate-900 rounded-xl h-48 flex items-center justify-center overflow-hidden border-2 border-indigo-500/50 mb-4">
-        <video id="camera-video" autoplay playsinline class="w-full h-full object-cover"></video>
-        <div class="absolute inset-x-8 border-t-2 border-red-500 animate-pulse shadow-lg pointer-events-none"></div>
-        <p id="camera-status" class="absolute text-xs text-slate-400 z-10 bg-slate-900/80 px-3 py-1 rounded pointer-events-none">正在初始化攝影機...</p>
-      </div>
-
-      <button onclick="simulateCameraScanSuccess()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-medium text-sm transition">
-        擷取畫面並建立卡片
-      </button>
-    </div>
-  </div>
-
-  <script>
-  const STORAGE_KEY = 'convenience_store_cards';
-  const REDEMPTION_KEY = 'convenience_store_redemptions';
-  const LOCK_KEY = 'convenience_store_lock';
-
-  // BarcodeDetector 優先（若瀏覽器支援）
-  let barcodeDetector = null;
-  if ('BarcodeDetector' in window) {
-    const supportedFormats = ['ean_13','ean_8','code_128','code_39','upc_a','upc_e'];
-    try {
-      barcodeDetector = new BarcodeDetector({ formats: supportedFormats });
-      console.info('使用原生 BarcodeDetector:', supportedFormats);
-    } catch (e) {
-      console.warn('BarcodeDetector 初始化失敗，回退至模擬:', e);
-      barcodeDetector = null;
-    }
-  } else {
-    console.warn('BarcodeDetector 不支援，將回退到模擬流程或加入第三方 library（建議引入 zxing/quagga）');
-  }
-
-  // （其餘與之前相容的預設資料）
-  const defaultCards = [
-    { id: '1', store: '7-11', code: '4710088432109', format: 'EAN13', balance: 350, date: '2026-03-10' },
-    { id: '2', store: 'FamilyMart', code: '5900128473', format: 'CODE128', balance: 120, date: '2026-03-12' },
-    { id: '3', store: 'Hi-Life', code: '4710382910', format: 'CODE128', balance: 0, date: '2026-02-28' },
-    { id: '4', store: '宜睿', code: '4719001122', format: 'CODE128', balance: 200, date: '2026-03-15' }
-  ];
-
-  let cards = [];
-  let currentFilter = 'all';
-  let selectedCardId = null;
-  let pendingBatchFiles = [];
-  let cameraStream = null;
-  let cameraDetectLoop = null;
-
-  const storeConfigs = {
-    '7-11': { name: '7-ELEVEN', badge: 'bg-emerald-600' },
-    'FamilyMart': { name: '全家 FamilyMart', badge: 'bg-blue-600' },
-    'Hi-Life': { name: '萊爾富 Hi-Life', badge: 'bg-red-600' },
-    '宜睿': { name: '宜睿', badge: 'bg-rose-700' }
-  };
-
-  function detectBarcodeFormat(code) {
-    if (typeof code !== 'string') code = String(code || '');
-    const cleanCode = code.trim();
-    if (/^\d{13}$/.test(cleanCode)) return 'EAN13';
-    if (/^\d{8}$/.test(cleanCode)) return 'EAN8';
-    if (/^\d{12}$/.test(cleanCode)) return 'UPC';
-    if (/^[A-Z0-9\-\.\ \$\/\+\%]+$/i.test(cleanCode)) return 'CODE39';
-    return 'CODE128';
-  }
-
-  const safeStorage = {
-    memoryStore: {},
-    getItem(key) {
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          return window.localStorage.getItem(key);
-        }
-      } catch (e) {
-        console.warn('LocalStorage 讀取失敗，改用記憶體暫存:', e);
-      }
-      return this.memoryStore[key] || null;
-    },
-    setItem(key, value) {
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(key, value);
-          return;
-        }
-      } catch (e) {
-        console.warn('LocalStorage 寫入失敗，改用記憶體暫存:', e);
-      }
-      this.memoryStore[key] = String(value);
-    },
-    removeItem(key) {
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.removeItem(key);
-          return;
-        }
-      } catch (e) {}
-      delete this.memoryStore[key];
-    }
-  };
-
-  document.addEventListener('DOMContentLoaded', () => {
-    loadCardsFromStorage();
-    renderCards();
-    renderRedemptions();
-  });
-
-  function loadCardsFromStorage() {
-    const savedData = safeStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        if (Array.isArray(parsed)) {
-          cards = parsed.map(c => ({
-            ...c,
-            code: (c.code === undefined || c.code === null) ? '' : String(c.code),
-            format: c.format || detectBarcodeFormat(c.code)
-          }));
-          return;
-        }
-      } catch (e) {
-        console.error('格式錯誤，回復為預設值:', e);
-      }
-    }
-    cards = defaultCards.map(c => ({ ...c, code: String(c.code), format: c.format || detectBarcodeFormat(c.code) }));
-    saveCardsToStorage();
-  }
-
-  function saveCardsToStorage() {
-    try {
-      const normalized = cards.map(c => ({
-        ...c,
-        code: (c.code === undefined || c.code === null) ? '' : String(c.code),
-        balance: Number(c.balance) || 0
-      }));
-      safeStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    } catch (e) {
-      console.error('儲存失敗:', e);
-    }
-  }
-
-  function loadRedemptions() {
-    try {
-      const raw = safeStorage.getItem(REDEMPTION_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error('讀取 redemption 失敗', e);
-      return [];
-    }
-  }
-
-  function saveRedemptions(redeems) {
-    try {
-      safeStorage.setItem(REDEMPTION_KEY, JSON.stringify(redeems || []));
-    } catch (e) {
-      console.error('儲存 redemption 失敗', e);
-    }
-  }
-
-  function renderRedemptions() {
-    const listEl = document.getElementById('redemption-list');
-    if (!listEl) return;
-    const items = loadRedemptions().slice(-20).reverse();
-    listEl.innerHTML = items.map(r => `<li class="py-1 text-xs">${r.ts} - 卡:${r.cardId} - 扣款:NT$${r.amount} - id:${r.idempotencyKey}</li>`).join('');
-  }
-
-  function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
-      return v.toString(16);
-    });
-  }
-
-  async function acquireLock(ownerId, ttl = 3000, retries = 6, waitMs = 200) {
-    for (let i=0; i<retries; i++) {
-      const now = Date.now();
-      const lockRaw = safeStorage.getItem(LOCK_KEY);
-      let lock = null;
-      try { lock = lockRaw ? JSON.parse(lockRaw) : null; } catch(e){ lock = null; }
-      if (!lock || !lock.expires || lock.expires < now) {
-        const newLock = { owner: ownerId, expires: now + ttl };
-        safeStorage.setItem(LOCK_KEY, JSON.stringify(newLock));
-        const check = safeStorage.getItem(LOCK_KEY);
-        try {
-          const parsed = check ? JSON.parse(check) : null;
-          if (parsed && parsed.owner === ownerId) {
-            return true;
-          }
-        } catch(e){}
-      }
-      await new Promise(res => setTimeout(res, waitMs));
-    }
-    return false;
-  }
-
-  function releaseLock(ownerId) {
-    try {
-      const lockRaw = safeStorage.getItem(LOCK_KEY);
-      if (!lockRaw) { safeStorage.removeItem(LOCK_KEY); return; }
-      const lock = JSON.parse(lockRaw);
-      if (lock.owner === ownerId) {
-        safeStorage.removeItem(LOCK_KEY);
-      }
-    } catch(e){
-      safeStorage.removeItem(LOCK_KEY);
-    }
-  }
-
-  async function updateCardBalanceAtomic(cardId, amount, idempotencyKey=null) {
-    if (!idempotencyKey) idempotencyKey = generateUUID();
-    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Invalid amount');
-
-    const ownerId = generateUUID();
-    const got = await acquireLock(ownerId, 4000, 8, 150);
-    if (!got) {
-      throw new Error('無法取得鎖（請稍後再試）');
-    }
-
-    try {
-      const redemptions = loadRedemptions();
-      if (redemptions.some(r => r.idempotencyKey === idempotencyKey)) {
-        return { status: 'already_processed' };
-      }
-
-      const rawCards = safeStorage.getItem(STORAGE_KEY);
-      const parsed = rawCards ? JSON.parse(rawCards) : [];
-      const localCards = Array.isArray(parsed) ? parsed : [];
-
-      const idx = localCards.findIndex(c => String(c.id) === String(cardId));
-      if (idx === -1) throw new Error('找不到指定卡片');
-
-      const card = localCards[idx];
-      const currentBalance = Number(card.balance) || 0;
-      if (currentBalance < amount) {
-        throw new Error('餘額不足');
-      }
-
-      localCards[idx] = { ...card, balance: Math.max(0, currentBalance - amount) };
-
-      const newRedemption = {
-        idempotencyKey,
-        cardId: String(cardId),
-        amount: Number(amount),
-        ts: new Date().toISOString()
-      };
-      redemptions.push(newRedemption);
-
-      safeStorage.setItem(STORAGE_KEY, JSON.stringify(localCards));
-      saveRedemptions(redemptions);
-
-      cards = localCards;
-      renderRedemptions();
-      return { status: 'ok', redemption: newRedemption, card: localCards[idx] };
-    } finally {
-      releaseLock(ownerId);
-    }
-  }
-
-  function safeRenderBarcode(selector, code, format, options = {}) {
-    const renderFormat = format || detectBarcodeFormat(code);
-    try {
-      JsBarcode(selector, String(code), {
-        format: renderFormat,
-        height: options.height || 40,
-        displayValue: false,
-        margin: 0,
-        lineColor: options.lineColor || "#0f172a"
-      });
-    } catch (e) {
-      console.warn(`[${renderFormat}] 渲染失敗，切換至 CODE128 備援:`, e);
-      try {
-        JsBarcode(selector, String(code), {
-          format: "CODE128",
-          height: options.height || 40,
-          displayValue: false,
-          margin: 0,
-          lineColor: options.lineColor || "#0f172a"
-        });
-      } catch (err) {
-        console.error('條碼繪製完全失敗:', err);
-      }
-    }
-  }
-
-  function escapeHtml(unsafe) {
-    return String(unsafe)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  function renderCards() {
-    const grid = document.getElementById('card-grid');
-    const emptyState = document.getElementById('empty-state');
-    if (!grid || !emptyState) return;
-
-    grid.innerHTML = '';
-
-    const filtered = cards.filter(c => currentFilter === 'all' || c.store === currentFilter);
-    emptyState.classList.toggle('hidden', filtered.length > 0);
-
-    filtered.forEach(card => {
-      const isDepleted = Number(card.balance) <= 0;
-      const config = storeConfigs[card.store] || storeConfigs['7-11'];
-
-      const cardEl = document.createElement('div');
-      cardEl.className = `bg-white rounded-2xl shadow-sm border ${isDepleted ? 'border-slate-300 grayscale opacity-75' : 'border-slate-200'} p-5 relative transition duration-200 hover:shadow-md flex flex-col justify-between overflow-hidden`;
-
-      const codeText = String(card.code || '');
-      const displayFormat = card.format || detectBarcodeFormat(codeText);
-
-      cardEl.innerHTML = `
-        <div>
-          <div class="flex justify-between items-start mb-3">
-            <span class="px-2.5 py-1 rounded-md text-xs font-bold text-white ${config.badge}">
-              ${config.name}
-            </span>
-            <div class="flex items-center space-x-2">
-              ${isDepleted ? `<span class="bg-slate-700 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">已用完</span>` : ''}
-              <button onclick="openEditModal('${card.id}')" title="編輯卡片" class="text-slate-400 hover:text-indigo-600 p-1 transition">
-                <i class="fa-solid fa-pen-to-square"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 border border-slate-100 rounded-xl p-3 my-2 flex flex-col items-center">
-            <svg id="barcode-${card.id}" class="w-full h-16"></svg>
-            <div class="flex items-center space-x-1.5 mt-1.5">
-              <span class="text-xs font-mono text-slate-500 tracking-wider">${escapeHtml(codeText)}</span>
-              <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-semibold uppercase">${displayFormat}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
-          <div>
-            <span class="text-xs text-slate-400 block">剩餘金額</span>
-            <span class="text-xl font-black ${isDepleted ? 'text-slate-500 line-through' : 'text-slate-800'}">
-              NT$ ${Number(card.balance).toLocaleString()}
-            </span>
-          </div>
-          
-          <button onclick="openPayModal('${card.id}')" ${isDepleted ? 'disabled' : ''} 
-            class="px-4 py-2 text-sm font-bold rounded-lg ${isDepleted ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'} transition">
-            <i class="fa-solid fa-qrcode mr-1"></i> 結帳
-          </button>
-        </div>
-      `;
-
-      grid.appendChild(cardEl);
-
-      safeRenderBarcode(`#barcode-${card.id}`, codeText, displayFormat, {
-        height: 40,
-        lineColor: isDepleted ? "#64748b" : "#0f172a"
-      });
-    });
-
-    calculateTotalBalance();
-  }
-
-  function calculateTotalBalance() {
-    const total = cards.filter(c => Number(c.balance) > 0).reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
-    const totalEl = document.getElementById('total-balance');
-    if (totalEl) {
-      totalEl.innerText = `NT$ ${total.toLocaleString()}`;
-    }
-  }
-
-  function setFilter(store) {
-    currentFilter = store;
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
-      btn.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
-    });
-
-    const activeBtn = document.getElementById(`tab-${store}`);
-    if (activeBtn) {
-      activeBtn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
-      activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
-    }
-
-    renderCards();
-  }
-
-  /* --- 相機條碼掃描（改成連續偵測，僅接受完整顯示的條碼） --- */
-  async function openScanModal() {
-    document.getElementById('scan-modal').classList.remove('hidden');
-    const video = document.getElementById('camera-video');
-    const statusText = document.getElementById('camera-status');
-    
-    statusText.innerText = "正在取得相機權限...";
-
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("瀏覽器不支援相機存取功能");
-      }
-
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-
-      video.srcObject = cameraStream;
-      statusText.innerText = "尋找一維條碼中...";
-
-      // 開始偵測迴圈（若支援 BarcodeDetector）
-      if (barcodeDetector) {
-        startCameraDetectLoop();
-      } else {
-        console.warn('BarcodeDetector 不支援：掃描會使用模擬按鈕 simulateCameraScanSuccess()');
-        statusText.innerText = "裝置不支援 BarcodeDetector，請使用「擷取畫面並建立卡片」模擬功能或在支援的瀏覽器上使用";
-      }
-    } catch (err) {
-      console.error("無法開啟攝影機:", err);
-      statusText.innerText = "相機開啟失敗，請確認權限設定";
-    }
-  }
-
-  function stopCamera() {
-    if (cameraDetectLoop) {
-      clearInterval(cameraDetectLoop);
-      cameraDetectLoop = null;
-    }
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      cameraStream = null;
-    }
-    const video = document.getElementById('camera-video');
-    if (video) video.srcObject = null;
-  }
-
-  function startCameraDetectLoop() {
-    const video = document.getElementById('camera-video');
-    const statusText = document.getElementById('camera-status');
-    if (!video) return;
-
-    // 建立隱藏 canvas 取得影格
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    cameraDetectLoop = setInterval(async () => {
-      try {
-        if (!video.videoWidth || !video.videoHeight) return;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // 使用 BarcodeDetector 偵測
-        const detections = await barcodeDetector.detect(canvas);
-        if (!detections || detections.length === 0) {
-          statusText.innerText = "尋找一維條碼中...";
-          return;
-        }
-
-        // 過濾：僅保留 boundingBox 完整位於畫面內的結果（margin）
-        const margin = Math.max(2, Math.floor(Math.min(canvas.width, canvas.height) * 0.01)); // 1% 邊界
-        const fullResults = detections.filter(d => {
-          const b = d.boundingBox;
-          if (!b) return false;
-          return (b.x >= margin && b.y >= margin && (b.x + b.width) <= (canvas.width - margin) && (b.y + b.height) <= (canvas.height - margin));
-        });
-
-        if (fullResults.length === 0) {
-          // 若沒有完整的，忽略
-          statusText.innerText = "發現條碼，但都非完整顯示，請調整角度或距離";
-          return;
-        }
-
-        // 取第一個完整顯示的條碼（你可以改成加入全部）
-        const picked = fullResults[0];
-        const code = String(picked.rawValue || '');
-        const format = (picked.format && String(picked.format).toUpperCase()) || detectBarcodeFormat(code);
-
-        // 建立卡片
-        const newCard = {
-          id: Date.now().toString(),
-          store: classifyStoreByBarcode(code),
-          code: code,
-          format: format,
-          balance: 100,
-          date: new Date().toISOString().split('T')[0]
-        };
-        cards.unshift(newCard);
-        saveCardsToStorage();
-        renderCards();
-
-        // 停止偵測並關閉 modal
-        stopCamera();
-        closeModal('scan-modal');
-      } catch (e) {
-        console.error('camera detect error', e);
-      }
-    }, 500); // 每 500ms 偵測一次，適度頻率避免 CPU 過高
-  }
-
-  function simulateCameraScanSuccess() {
-    // 若不支援 BarcodeDetector，維持模擬行為（保留）
-    const mockCode = '471' + String(Math.floor(100000000 + Math.random() * 900000000));
-    const format = detectBarcodeFormat(mockCode);
-    const newCard = {
-      id: Date.now().toString(),
-      store: classifyStoreByBarcode(mockCode),
-      code: String(mockCode),
-      format: format,
-      balance: 500,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    cards.unshift(newCard);
-    saveCardsToStorage();
-    renderCards();
-    closeModal('scan-modal');
-  }
-
-  /* --- 批次匯入：對每張照片偵測條碼，僅使用完整顯示的條碼 --- */
-  function triggerFileInput() {
-    const fileInput = document.getElementById('batch-file-input');
-    if (fileInput) fileInput.click();
-  }
-
-  function handleFileSelect(e) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    pendingBatchFiles = Array.from(files);
-    const textEl = document.getElementById('batch-file-count-text');
-    const balanceEl = document.getElementById('batch-balance');
-    const storeEl = document.getElementById('batch-store');
-
-    if (textEl) textEl.innerText = `已選取 ${pendingBatchFiles.length} 張照片`;
-    if (balanceEl) balanceEl.value = '';
-    if (storeEl) storeEl.value = 'auto';
-
-    const modal = document.getElementById('batch-modal');
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  // helper: 將 image/file 轉成 ImageBitmap (或 Image)
-  function createImageBitmapFromFile(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = (e) => reject(e);
-      img.src = URL.createObjectURL(file);
-    });
-  }
-
-  // 判斷 boundingBox 完整（相對於 canvas）
-  function isBoundingBoxFullyVisible(bbox, canvasWidth, canvasHeight, margin=2) {
-    if (!bbox) return false;
-    return (bbox.x >= margin &&
-            bbox.y >= margin &&
-            (bbox.x + bbox.width) <= (canvasWidth - margin) &&
-            (bbox.y + bbox.height) <= (canvasHeight - margin));
-  }
-
-  async function detectBarcodesInImageElement(imgElement) {
-    // imgElement: HTMLImageElement
-    const canvas = document.createElement('canvas');
-    canvas.width = imgElement.naturalWidth || imgElement.width;
-    canvas.height = imgElement.naturalHeight || imgElement.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
-
-    if (!barcodeDetector) {
-      // fallback: 無法辨識，回傳空陣列（或你可以整合第三方 lib）
-      console.warn('BarcodeDetector 不可用，跳過實際偵測。建議引入 zxing / quagga');
-      return [];
-    }
-
-    try {
-      const detections = await barcodeDetector.detect(canvas);
-      // filter 只要完整顯示的 boundingBox
-      const margin = Math.max(2, Math.floor(Math.min(canvas.width, canvas.height) * 0.01)); // 1% 邊界
-      const full = detections.filter(d => isBoundingBoxFullyVisible(d.boundingBox, canvas.width, canvas.height, margin));
-      return full.map(d => ({
-        rawValue: String(d.rawValue || ''),
-        format: (d.format || '').toUpperCase(),
-        boundingBox: d.boundingBox
-      }));
-    } catch (e) {
-      console.error('圖片偵測失敗', e);
-      return [];
-    }
-  }
-
-  async function executeBatchImport(e) {
-    e.preventDefault();
-    if (pendingBatchFiles.length === 0) return;
-
-    const selectedStore = document.getElementById('batch-store').value;
-    const customBalanceInput = document.getElementById('batch-balance').value;
-    const parsedBalance = customBalanceInput !== '' ? parseInt(customBalanceInput, 10) : null;
-
-    // 如果沒有 BarcodeDetector，還是保留原模擬流程（避免完全無法使用）
-    if (!barcodeDetector) {
-      console.warn('Browser 不支援 BarcodeDetector，使用原模擬匯入流程');
-      pendingBatchFiles.forEach((file, index) => {
-        const prefixes = ['4710', '5900', '7110', '4719'];
-        const prefix = prefixes[index % prefixes.length];
-        const generatedCode = prefix + String(Math.floor(10000000 + Math.random() * 90000000));
-        const format = detectBarcodeFormat(generatedCode);
-
-        const cardStore = selectedStore === 'auto' ? classifyStoreByBarcode(generatedCode) : selectedStore;
-       const cardBalance = (parsedBalance !== null && !isNaN(parsedBalance))  ? Math.max(0, parsedBalance)  : (200 + (index * (100));
-
-        cards.unshift({
-          id: (Date.now() + index).toString(),
-          store: cardStore,
-          code: String(generatedCode),
-          format: format,
-          balance: cardBalance,
-          date: new Date().toISOString().split('T')[0]
-        });
-      });
-
-      saveCardsToStorage();
-      renderCards();
-      closeModal('batch-modal');
-      const fileInput = document.getElementById('batch-file-input');
-      if (fileInput) fileInput.value = '';
-      return;
-    }
-
-    // 有 BarcodeDetector：針對每張照片偵測並只使用完整顯示的條碼
-    for (let i = 0; i < pendingBatchFiles.length; i++) {
-      const file = pendingBatchFiles[i];
-      try {
-        const img = await createImageBitmapFromFile(file);
-        const detections = await detectBarcodesInImageElement(img);
-        if (!detections || detections.length === 0) {
-          // 無完整條碼 -> 跳過（或可選擇嘗試模糊辨識）
-          console.info(`第 ${i+1} 張圖：未偵測到完整條碼，已跳過`);
-          continue;
-        }
-
-        // 為每個完整條碼建立卡片（也可以只取第一個）
-        for (let j = 0; j < detections.length; j++) {
-          const d = detections[j];
-          const code = String(d.rawValue || '');
-          const format = d.format || detectBarcodeFormat(code);
-          const cardStore = (selectedStore === 'auto') ? classifyStoreByBarcode(code) : selectedStore;
-          const cardBalance = (parsedBalance !== null && !isNaN(parsedBalance))  ? Math.max(0, parsedBalance)  :  (200 + (index * (100));
-
-          cards.unshift({
-            id: (Date.now() + i + j).toString(),
-            store: cardStore,
-            code: code,
-            format: format,
-            balance: cardBalance,
-            date: new Date().toISOString().split('T')[0]
-          });
-        }
-      } catch (err) {
-        console.error('處理圖片失敗，跳過：', err);
-      }
-    }
-
-    saveCardsToStorage();
-    renderCards();
-    closeModal('batch-modal');
-
-    const fileInput = document.getElementById('batch-file-input');
-    if (fileInput) fileInput.value = '';
-  }
-
-  function openEditModal(id) {
-    selectedCardId = id;
-    const card = cards.find(c => String(c.id) === String(id));
-    if (!card) return;
-
-    document.getElementById('edit-store').value = card.store;
-    document.getElementById('edit-code').value = String(card.code);
-    document.getElementById('edit-format').value = card.format || detectBarcodeFormat(card.code);
-    document.getElementById('edit-balance').value = Number(card.balance);
-
-    document.getElementById('edit-modal').classList.remove('hidden');
-  }
-
-  function handleSaveEdit(e) {
-    e.preventDefault();
-    const card = cards.find(c => String(c.id) === String(selectedCardId));
-    if (card) {
-      card.store = document.getElementById('edit-store').value;
-      card.code = String(document.getElementById('edit-code').value.trim());
-      card.format = document.getElementById('edit-format').value;
-      card.balance = Math.max(0, parseInt(document.getElementById('edit-balance').value, 10) || 0);
-
-      saveCardsToStorage();
-      renderCards();
-      closeModal('edit-modal');
-    }
-  }
-
-  function handleDeleteCard() {
-    if (confirm('確定要刪除這張商品卡嗎？此動作無法復原。')) {
-      cards = cards.filter(c => String(c.id) !== String(selectedCardId));
-      saveCardsToStorage();
-      renderCards();
-      closeModal('edit-modal');
-    }
-  }
-
-  function openPayModal(id) {
-    selectedCardId = id;
-    const card = cards.find(c => String(c.id) === String(id));
-    if (!card) return;
-
-    const config = storeConfigs[card.store] || storeConfigs['7-11'];
-    const badge = document.getElementById('modal-store-badge');
-    badge.innerText = config.name;
-    badge.className = `px-3 py-1 rounded-full text-xs font-bold tracking-wider text-white inline-block mb-1 ${config.badge}`;
-
-    document.getElementById('pay-card-num').innerText = String(card.code);
-    document.getElementById('pay-barcode-format').innerText = card.format || detectBarcodeFormat(card.code);
-    document.getElementById('pay-modal-balance').innerText = `NT$ ${Number(card.balance).toLocaleString()}`;
-    document.getElementById('deduct-amount').value = '';
-
-    safeRenderBarcode("#pay-barcode", String(card.code), card.format, {
-      height: 70,
-      lineColor: "#0f172a"
-    });
-
-    document.getElementById('pay-modal').classList.remove('hidden');
-  }
-
-  function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.classList.add('hidden');
-    if (modalId === 'scan-modal') {
-      stopCamera();
-    }
-  }
-
-  async function handleCheckout(e) {
-    e.preventDefault();
-    const amount = parseInt(document.getElementById('deduct-amount').value, 10);
-    if (isNaN(amount) || amount <= 0) {
-      alert('請輸入有效的扣款金額');
-      return;
-    }
-
-    const card = cards.find(c => String(c.id) === String(selectedCardId));
-    if (!card) {
-      alert('找不到卡片');
-      return;
-    }
-
-    try {
-      const idempotencyKey = generateUUID();
-      const result = await updateCardBalanceAtomic(card.id, amount, idempotencyKey);
-      if (result.status === 'ok' || result.status === 'already_processed') {
-        saveCardsToStorage();
-        renderCards();
-        closeModal('pay-modal');
-        if (result.status === 'ok') {
-          alert(`扣款成功：NT$ ${amount}\n新餘額：NT$ ${Number(result.card.balance).toLocaleString()}`);
+</div>
+
+<script>
+    // 預設資料
+    const defaultCards = [
+        { id: 'Card-711-A', store: '7-11', balance: 50, barcode: '711-BARCODE-9981' },
+        { id: 'Card-711-B', store: '7-11', balance: 300, barcode: '711-BARCODE-5542' },
+        { id: 'Card-711-C', store: '7-11', balance: 120, barcode: '711-BARCODE-1103' },
+        { id: 'Card-Family-A', store: '全家', balance: 100, barcode: 'FAM-BARCODE-8831' },
+        { id: 'Card-Family-B', store: '全家', balance: 500, barcode: 'FAM-BARCODE-2290' },
+        { id: 'Card-HiLife-A', store: '萊爾富', balance: 250, barcode: 'HILIFE-BARCODE-7762' }
+    ];
+
+    let giftCards = [];
+    let activeStoreForCheckout = null;
+
+    // 初始化載入
+    function initApp() {
+        const saved = localStorage.getItem('my_gift_cards');
+        if (saved) {
+            try {
+                giftCards = JSON.parse(saved);
+            } catch (e) {
+                giftCards = [...defaultCards];
+            }
         } else {
-          alert('此交易已處理過，未重複扣款');
+            giftCards = [...defaultCards];
+            saveCards();
         }
-      }
-    } catch (err) {
-      if (String(err.message).includes('餘額不足')) {
-        alert('餘額不足，請確認金額或使用其他付款方式');
-      } else {
-        alert('扣款失敗：' + String(err.message));
-        console.error(err);
-      }
+        renderUI();
     }
-  }
 
-  function classifyStoreByBarcode(code) {
-    const s = String(code || '');
-    if (s.startsWith('711') || s.startsWith('471')) return '7-11';
-    if (s.startsWith('590')) return 'FamilyMart';
-    if (s.startsWith('4710')) return 'Hi-Life';
-    return '宜睿';
-  }
+    function saveCards() {
+        localStorage.setItem('my_gift_cards', JSON.stringify(giftCards));
+    }
+
+    function resetToDefaultData() {
+        if(confirm("確定要重置為預設的商品卡餘額嗎？")) {
+            giftCards = [...defaultCards];
+            saveCards();
+            renderUI();
+            alert("已重置！");
+        }
+    }
+
+    // 渲染 UI 介面
+    function renderUI() {
+        const container = document.getElementById('stores-container');
+        container.innerHTML = '';
+
+        // 依超商分類
+        const storesMap = {};
+        giftCards.forEach(card => {
+            if (!storesMap[card.store]) {
+                storesMap[card.store] = [];
+            }
+            storesMap[card.store].push(card);
+        });
+
+        // 建立各超商區塊
+        for (let storeName in storesMap) {
+            let cards = storesMap[storeName];
+            // 畫面也順便將該超商內的卡片依餘額排序顯示
+            cards.sort((a, b) => a.balance - b.balance);
+
+            let totalBalance = cards.reduce((sum, c) => sum + c.balance, 0);
+
+            let storeDiv = document.createElement('div');
+            storeDiv.className = 'store-group';
+            
+            let cardListHtml = cards.map(c => `
+                <div class="sub-card">
+                    <div class="sub-card-info">
+                        <span class="sub-card-id">${c.id}</span>
+                        <span class="sub-card-barcode">條碼: ${c.barcode}</span>
+                    </div>
+                    <div class="sub-card-bal">$${c.balance}</div>
+                </div>
+            `).join('');
+
+            storeDiv.innerHTML = `
+                <div class="store-header">
+                    <span class="store-title">${storeName} 商品卡</span>
+                    <span class="store-total-balance">總餘額: $${totalBalance}</span>
+                </div>
+                <div class="card-list">
+                    ${cardListHtml}
+                </div>
+                <button class="btn" onclick="openCheckoutModal('${storeName}')">使用 ${storeName} 結帳 (自動串接)</button>
+            `;
+            container.appendChild(storeDiv);
+        }
+    }
+
+    // 彈跳視窗控制
+    function openCheckoutModal(storeName) {
+        activeStoreForCheckout = storeName;
+        document.getElementById('modal-store-titleinnerText').innerText = `${storeName} 快速結帳`;
+        document.getElementById('checkout-amount').value = '';
+        document.getElementById('checkout-result').innerHTML = '';
+        document.getElementById('checkout-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('checkout-modal').style.display = 'none';
+        activeStoreForCheckout = null;
+        renderUI(); // 關閉時重新整理主畫面以更新餘額
+    }
+
+    // 核心扣款邏輯：最小餘額優先
+    function confirmCheckout() {
+        let amountInput = document.getElementById('checkout-amount').value;
+        let amount = parseFloat(amountInput);
+
+        if (isNaN(amount) || amount <= 0) {
+            alert("請輸入正確的消費金額！");
+            return;
+        }
+
+        // 1. 抓出該超商卡片並強制「最小餘額優先」排序
+        let storeCards = giftCards.filter(c => c.store === activeStoreForCheckout);
+        storeCards.sort((a, b) => a.balance - b.balance);
+
+        let totalAvailable = storeCards.reduce((sum, c) => sum + c.balance, 0);
+
+        let resultContainer = document.getElementById('checkout-result');
+
+        if (totalAvailable < amount) {
+            resultContainer.innerHTML = `<p style="color: red; font-weight: bold;">扣款失敗：${activeStoreForCheckout} 總餘額不足（可用總額 $${totalAvailable}）</p>`;
+            return;
+        }
+
+        let remainingAmount = amount;
+        let logs = [];
+
+        // 2. 迴圈依序扣款
+        for (let card of storeCards) {
+            if (remainingAmount <= 0) break;
+
+            let deduct = Math.min(card.balance, remainingAmount);
+            card.balance -= deduct;
+            remainingAmount -= deduct;
+
+            logs.push({
+                cardId: card.id,
+                barcode: card.barcode,
+                deducted: deduct,
+                newBalance: card.balance
+            });
+        }
+
+        // 3. 儲存最新狀態
+        saveCards();
+
+        // 4. 顯示連續刷卡與條碼指引
+        let htmlResult = `<p style="color: green; font-weight: bold; margin-bottom: 10px;">✅ 扣款成功！請依序出示以下條碼：</p>`;
+        logs.forEach((log, index) => {
+            htmlResult += `
+                <div class="result-step">
+                    <strong>步驟 ${index + 1}：請刷 ${log.cardId}</strong><br>
+                    扣抵金額：<span style="color: #d97706; font-weight: bold;">$${log.deducted}</span> (卡片剩餘: $${log.newBalance})
+                    <div class="barcode-box">║█║▌║█║${log.barcode}</div>
+                </div>
+            `;
+        });
+
+        resultContainer.innerHTML = htmlResult;
+    }
+
+    // 頁面載入初始化
+    window.onload = initApp;
 </script>
+
 </body>
 </html>
